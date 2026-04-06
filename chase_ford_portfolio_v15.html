@@ -1,0 +1,385 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Special+Elite&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .board {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #f0ebe0;
+    overflow: hidden;
+    border: 2px solid #1a1a1a;
+    position: relative;
+    font-family: 'Special Elite', monospace;
+  }
+
+  .bg-img {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    opacity: 0.18;
+    pointer-events: none;
+    z-index: 0;
+    display: none;
+  }
+  .bg-img.loaded { display: block; }
+
+  .site-name {
+    position: absolute;
+    top: 5%; left: 0; right: 0;
+    text-align: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-weight: 700;
+    font-size: 4vw;
+    letter-spacing: 0.18em;
+    color: #1a1a1a;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .tile {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    transition:
+      left   0.5s cubic-bezier(0.77,0,0.175,1),
+      top    0.5s cubic-bezier(0.77,0,0.175,1),
+      width  0.5s cubic-bezier(0.77,0,0.175,1),
+      transform 0.2s ease;
+    z-index: 5;
+  }
+
+  .tile:hover:not(.anchored):not(.no-hover) { transform: scale(1.06); }
+
+  .cat-tile          { z-index: 10; }
+  .sub-tile          { z-index: 5;  }
+  .sub-tile.anchored { z-index: 15; }
+  .cat-tile.shelved  { z-index: 3;  }
+  .sub-tile.shelved  { z-index: 4;  }
+
+  .tile-box {
+    border: 1.5px solid #aaa;
+    padding: 0.45em 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    transition: border-color 0.3s;
+  }
+
+  .tile-img { width: 100%; display: none; object-fit: contain; }
+  .tile.has-image .tile-box { display: none; }
+  .tile.has-image .tile-img { display: block; }
+
+  .tile.anchored            { align-items: flex-start; cursor: default; }
+  .tile.anchored .tile-box  { border-color: #1a1a1a; justify-content: flex-start; }
+
+  /* shelved = small and left-justified */
+  .tile.shelved             { align-items: flex-start; }
+  .tile.shelved .tile-box   { justify-content: flex-start; border-color: #ccc; }
+
+  .tile-label {
+    font-family: 'Bebas Neue', sans-serif;
+    letter-spacing: 0.16em;
+    color: #1a1a1a;
+    text-align: center;
+    line-height: 1.2;
+    transition: font-size 0.45s cubic-bezier(0.77,0,0.175,1);
+  }
+  .tile-label.lc { font-family: 'Special Elite', monospace; letter-spacing: 0.07em; }
+
+  /* resting sizes */
+  .cat-tile .tile-label             { font-size: 2.8vw; }
+  .sub-tile .tile-label             { font-size: 1.4vw; }
+  .sub-tile .tile-label.lc          { font-size: 1.05vw; }
+
+  /* anchored = expanded, left aligned */
+  .anchored.cat-tile .tile-label    { font-size: 1.8vw; text-align: left; }
+  .anchored.sub-tile .tile-label    { font-size: 2.2vw; text-align: left; }
+  .anchored.sub-tile .tile-label.lc { font-size: 1.6vw; text-align: left; }
+
+  /* shelved = shrunk, left aligned */
+  .shelved.cat-tile .tile-label     { font-size: 1.1vw; text-align: left; color: #666; }
+  .shelved.sub-tile .tile-label     { font-size: 0.85vw; text-align: left; color: #666; }
+  .shelved.sub-tile .tile-label.lc  { font-size: 0.72vw; text-align: left; color: #666; }
+
+  .tile-sub {
+    font-size: 0px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: #777; overflow: hidden; max-height: 0; opacity: 0; white-space: nowrap;
+    transition: font-size 0.4s ease, max-height 0.4s ease, opacity 0.35s ease, margin-top 0.3s ease;
+  }
+  .anchored .tile-sub { font-size: 0.65vw; max-height: 2em; opacity: 1; margin-top: 0.4em; }
+
+  .tile-content {
+    width: 100%; max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height 0.5s cubic-bezier(0.77,0,0.175,1), opacity 0.35s ease 0.1s, margin-top 0.3s ease;
+  }
+  .anchored.sub-tile .tile-content { max-height: 400px; opacity: 1; margin-top: 0.8em; }
+
+  .content-inner {
+    border-top: 1.5px solid #1a1a1a; padding-top: 0.8em;
+    display: flex; flex-direction: column; gap: 0.7em;
+  }
+  .proj-img {
+    border: 1.5px dashed #aaa; height: 6vw;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.58vw; letter-spacing: 0.14em; text-transform: uppercase; color: #aaa;
+  }
+  .proj-body { font-size: 0.78vw; line-height: 1.75; color: #333; }
+  .proj-tags { display: flex; flex-wrap: wrap; gap: 0.35em; margin-top: 0.2em; }
+  .tag {
+    font-size: 0.52vw; letter-spacing: 0.13em; text-transform: uppercase;
+    border: 1px solid #1a1a1a; padding: 0.15em 0.45em; color: #1a1a1a;
+  }
+
+  .contact-label {
+    position: absolute; bottom: 2.5%; right: 2.5%;
+    font-family: 'Bebas Neue', sans-serif; font-size: 1.1vw;
+    letter-spacing: 0.2em; color: #999; cursor: pointer; z-index: 20;
+    transition: color 0.2s, bottom 0.5s cubic-bezier(0.77,0,0.175,1);
+  }
+  .contact-label:hover { color: #1a1a1a; }
+
+  .contact-panel {
+    position: absolute; bottom: 0; right: 0; width: 26vw;
+    background: #faf7f0; border: 1.5px solid #1a1a1a;
+    border-right: none; border-bottom: none;
+    padding: 1.4vw 1.8vw;
+    transform: translateY(100%);
+    transition: transform 0.45s cubic-bezier(0.77,0,0.175,1);
+    z-index: 30;
+  }
+  .contact-panel.open { transform: translateY(0); }
+  .contact-close {
+    position: absolute; top: 0.6vw; right: 0.8vw;
+    font-size: 0.85vw; cursor: pointer; color: #999;
+    font-family: 'Bebas Neue', sans-serif;
+  }
+  .contact-close:hover { color: #1a1a1a; }
+  .contact-body { font-size: 0.72vw; line-height: 2; color: #333; margin-top: 0.3vw; }
+</style>
+
+<div class="board" id="board">
+  <img class="bg-img" id="bgImg" src="background.jpg" alt=""
+    onload="this.classList.add('loaded')" onerror="this.style.display='none'">
+  <div class="site-name">CHASE FORD</div>
+  <div class="contact-label" id="contactLabel">CONTACT</div>
+  <div class="contact-panel" id="contactPanel">
+    <div class="contact-close" id="contactClose">✕</div>
+    <div class="contact-body">
+      chase@chasefordaudio.com<br>(801) 555-0199<br><br>
+      Or, if you'd prefer to meet in real life, I will be at People's Coffee in Salt Lake City on May 15, 2026, holding a red rose and reading a copy of <em>Pride and Prejudice</em> from 10am to noon.
+    </div>
+  </div>
+</div>
+
+<script>
+const board = document.getElementById('board');
+
+const cats = [
+  {
+    key: 'music', label: 'MUSIC',
+    imgSrc: 'cat-music.png',
+    projects: [
+      { id: 'fn',  label: 'FAKE NICE',                   lc: false, sub: 'BAND',            imgSrc: 'sub-fake-nice.png',    roles: ['PERFORMER','SONGWRITER','PRODUCER','MARKETER','TOUR ORGANIZER'], body: 'Your description of Fake Nice — the sound, the run, what made it matter.' },
+      { id: 'gb',  label: 'chase ford\n& the gummy boys', lc: true,  sub: 'FAKE PROMO BAND', imgSrc: 'sub-gummy-boys.png',   roles: ['CONCEPT','PERFORMANCE','GUERRILLA MARKETING'], body: 'A fictional band built to promote the second Fake Nice album.' },
+      { id: 'jj',  label: 'JESUS JR',                    lc: false, sub: 'BAND — ACTIVE',   imgSrc: 'sub-jesus-jr.png',     roles: ['PERFORMER','SONGWRITER','PRODUCER','GUERRILLA MARKETING'], body: 'Underground garage rock. Physical-only releases, invite-only shows, no streaming.' }
+    ]
+  },
+  {
+    key: 'film', label: 'FILM',
+    imgSrc: 'cat-film.png',
+    projects: [
+      { id: 'll',  label: 'LOWLIFES',       lc: false, sub: 'NARRATIVE MINI-SERIES', imgSrc: 'sub-lowlifes.png',      roles: ['WRITER','DIRECTOR','ACTOR'], body: 'A mini-series written, directed, and starring Chase Ford.' },
+      { id: 'ps',  label: 'PICKLE STORY',   lc: false, sub: 'SHORT FILM',            imgSrc: 'sub-pickle-story.png',  roles: ['WRITER','DIRECTOR'],        body: 'Your description of Pickle Story goes here.' },
+      { id: 'slj', label: 'SALT LAKE JAKE', lc: false, sub: 'SHORT FILM',            imgSrc: 'sub-salt-lake-jake.png',roles: ['WRITER','DIRECTOR'],        body: 'Your description of Salt Lake Jake goes here.' }
+    ]
+  },
+  {
+    key: 'forhire', label: 'FOR HIRE',
+    imgSrc: 'cat-for-hire.png',
+    projects: [
+      { id: 'cfa', label: 'CHASE FORD AUDIO', lc: false, sub: 'PRODUCTION COMPANY', imgSrc: 'sub-chase-ford-audio.png', roles: ['PRODUCER','ENGINEER','MIXER'],  body: 'Production work for local bands and artists.' },
+      { id: 'pt',  label: 'PRODUCED TRACKS',  lc: false, sub: 'STUDIO PRODUCTION',  imgSrc: 'sub-produced-tracks.png',  roles: ['PRODUCER','ARRANGER','MIXER'],  body: 'Tracks produced for various local artists.' },
+      { id: 'mv',  label: 'MUSIC VIDEOS',     lc: false, sub: 'DIRECTED',           imgSrc: 'sub-music-videos.png',     roles: ['DIRECTOR','EDITOR'],           body: 'Music video direction for local acts.' }
+    ]
+  }
+];
+
+const CAT_REST   = [{l:14,t:40},{l:40,t:40},{l:65,t:40}];
+const CAT_SHELF  = [{l:5,t:82},{l:25,t:82},{l:50,t:82}];
+const CAT_ANCHOR = {l:3, t:5};
+
+const SUB_REST   = [{l:8,t:40},{l:37,t:40},{l:66,t:40}];
+const SUB_SHELF  = [{l:5,t:62},{l:35,t:62},{l:65,t:62}];
+const SUB_ANCHOR = {l:3, t:22};
+
+let activeCat = null;
+let activeSub = null;
+const catEls = [];
+const subElGroups = {};
+
+function makeTileEl(label, lc, isCat, imgSrc) {
+  const el = document.createElement('div');
+  el.className = 'tile ' + (isCat ? 'cat-tile' : 'sub-tile');
+
+  const img = document.createElement('img');
+  img.className = 'tile-img';
+  img.alt = label.replace('\n',' ');
+  if (imgSrc) {
+    img.src = imgSrc;
+    img.onload = () => el.classList.add('has-image');
+    img.onerror = () => {};
+  }
+  el.appendChild(img);
+
+  const box = document.createElement('div');
+  box.className = 'tile-box';
+  const lbl = document.createElement('div');
+  lbl.className = 'tile-label' + (lc ? ' lc' : '');
+  label.split('\n').forEach((line, i) => {
+    if (i > 0) lbl.appendChild(document.createElement('br'));
+    lbl.appendChild(document.createTextNode(line));
+  });
+  box.appendChild(lbl);
+  el.appendChild(box);
+  return el;
+}
+
+cats.forEach((cat, ci) => {
+  const el = makeTileEl(cat.label, false, true, cat.imgSrc);
+  el.style.left  = CAT_REST[ci].l + '%';
+  el.style.top   = CAT_REST[ci].t + '%';
+  el.style.width = '20%';
+  board.appendChild(el);
+  catEls.push(el);
+
+  el.addEventListener('click', () => {
+    activeCat === cat.key ? closeAll() : openCat(cat.key, ci);
+  });
+
+  subElGroups[cat.key] = [];
+  cat.projects.forEach((p, pi) => {
+    const sel = makeTileEl(p.label, p.lc, false, p.imgSrc);
+    sel.dataset.pid = p.id;
+
+    const subLabel = document.createElement('div');
+    subLabel.className = 'tile-sub';
+    subLabel.textContent = p.sub;
+    sel.appendChild(subLabel);
+
+    const contentWrap = document.createElement('div');
+    contentWrap.className = 'tile-content';
+    const inner = document.createElement('div');
+    inner.className = 'content-inner';
+    const projImg = document.createElement('div');
+    projImg.className = 'proj-img';
+    projImg.textContent = 'YOUR DRAWN ARTWORK HERE';
+    inner.appendChild(projImg);
+    const body = document.createElement('div');
+    body.className = 'proj-body';
+    body.textContent = p.body;
+    inner.appendChild(body);
+    const tags = document.createElement('div');
+    tags.className = 'proj-tags';
+    tags.innerHTML = p.roles.map(r => `<span class="tag">${r}</span>`).join('');
+    inner.appendChild(tags);
+    contentWrap.appendChild(inner);
+    sel.appendChild(contentWrap);
+
+    sel.style.left  = SUB_REST[pi].l + '%';
+    sel.style.top   = '130%';
+    sel.style.width = '24%';
+    board.appendChild(sel);
+    subElGroups[cat.key].push(sel);
+
+    sel.addEventListener('click', () => {
+      if (activeCat !== cat.key) return;
+      activeSub === p.id ? closeSub(cat.key) : openSub(cat.key, p.id);
+    });
+  });
+});
+
+function openCat(key, ci) {
+  if (activeSub) closeSub(activeCat, true);
+  if (activeCat && activeCat !== key) {
+    subElGroups[activeCat].forEach(s => { s.style.top = '130%'; });
+  }
+  activeCat = key;
+
+  cats.forEach((c, i) => {
+    const el = catEls[i];
+    if (c.key === key) {
+      el.classList.add('anchored');
+      el.classList.remove('shelved');
+      el.style.left  = CAT_ANCHOR.l + '%';
+      el.style.top   = CAT_ANCHOR.t + '%';
+      el.style.width = '18%';
+    } else {
+      el.classList.remove('anchored');
+      el.classList.add('shelved');
+      el.style.left  = CAT_SHELF[i].l + '%';
+      el.style.top   = CAT_SHELF[i].t + '%';
+      el.style.width = '14%';
+    }
+  });
+
+  subElGroups[key].forEach((sel, pi) => {
+    sel.classList.remove('anchored','shelved');
+    sel.style.left  = SUB_REST[pi].l + '%';
+    sel.style.top   = SUB_REST[pi].t + '%';
+    sel.style.width = '24%';
+  });
+}
+
+function openSub(key, pid) {
+  activeSub = pid;
+  subElGroups[key].forEach((s, pi) => {
+    if (s.dataset.pid === pid) {
+      s.classList.add('anchored');
+      s.classList.remove('shelved');
+      s.style.left  = SUB_ANCHOR.l + '%';
+      s.style.top   = SUB_ANCHOR.t + '%';
+      s.style.width = '90%';
+    } else {
+      s.classList.remove('anchored');
+      s.classList.add('shelved');
+      s.style.left  = SUB_SHELF[pi].l + '%';
+      s.style.top   = SUB_SHELF[pi].t + '%';
+      s.style.width = '18%';
+    }
+  });
+}
+
+function closeSub(key, silent) {
+  activeSub = null;
+  if (!silent) {
+    subElGroups[key].forEach((s, pi) => {
+      s.classList.remove('anchored','shelved');
+      s.style.left  = SUB_REST[pi].l + '%';
+      s.style.top   = SUB_REST[pi].t + '%';
+      s.style.width = '24%';
+    });
+  }
+}
+
+function closeAll() {
+  if (activeSub) closeSub(activeCat, true);
+  if (activeCat) subElGroups[activeCat].forEach(s => { s.style.top = '130%'; });
+  activeCat = null; activeSub = null;
+  cats.forEach((c, i) => {
+    catEls[i].classList.remove('anchored','shelved');
+    catEls[i].style.left  = CAT_REST[i].l + '%';
+    catEls[i].style.top   = CAT_REST[i].t + '%';
+    catEls[i].style.width = '20%';
+  });
+}
+
+document.getElementById('contactClose').addEventListener('click', () =>
+  document.getElementById('contactPanel').classList.remove('open'));
+document.getElementById('contactLabel').addEventListener('click', () =>
+  document.getElementById('contactPanel').classList.toggle('open'));
+</script>
